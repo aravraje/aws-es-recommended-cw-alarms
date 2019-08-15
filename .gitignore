@@ -1,0 +1,5 @@
+.env
+*.egg-info
+cdk.out
+__pycache__
+.vscode
