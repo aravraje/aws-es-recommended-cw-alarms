@@ -4,8 +4,6 @@ from aws_cdk import (
     aws_lambda as _lambda
 )
 import boto3
-import json
-import sys
 
 
 class AwsEsRecommendedCwAlarmsStack(core.Stack):
