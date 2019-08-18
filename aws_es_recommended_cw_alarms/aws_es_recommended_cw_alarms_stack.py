@@ -218,7 +218,7 @@ class AwsEsRecommendedCwAlarmsStack(core.Stack):
             )
 
         # Setting a Cloudwatch Alarm on the KMSKeyError & KMSKeyInaccessible metrics 
-        # only if Dedicated Master is enabled
+        # only if Encryption at Rest config is enabled
         if is_encryption_at_rest_enabled:
             self._KMSKeyErrorAlarm = cloudwatch.Alarm(
                 self,
