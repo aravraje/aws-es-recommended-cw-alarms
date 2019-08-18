@@ -6,7 +6,7 @@ import os
 
 app = core.App()
 
-AwsEsRecommendedCwAlarmsStack(app, "aws-es-recommended-cw-alarms", os.environ["ES_DOMAIN_ARN"], env={
+AwsEsRecommendedCwAlarmsStack(app, "aws-es-recommended-cw-alarms", os.environ["ES_DOMAIN_ARN"], 'araviraj', env={
     "account": os.environ["ES_DOMAIN_ARN"].split(":")[4] or os.environ["CDK_DEFAULT_ACCOUNT"],
     "region": os.environ["ES_DOMAIN_ARN"].split(":")[3] or os.environ["CDK_DEFAULT_REGION"],
 })
