@@ -8,7 +8,7 @@ import json
 import sys
 
 """
-Use this only for ES >= 5.x.
+Use this only for AWS ES >= 5.1.
 Only log things that are not there in the K2.
 Get Data node volume size and number of node (master + data) from user.
 """
@@ -19,11 +19,10 @@ class AwsEsRecommendedCwAlarmsStack(core.Stack):
     ) -> None:
         super().__init__(scope, id, **kwargs)
 
-        # Getting the domain name from the ARN
         domain_name = domain_arn.split("/")[1]
 
         # Getting the domain details via boto3
-        session = boto3.Session(profile_name='araviraj')
+        session = boto3.Session(profile_name='default')
         es_client = session.client('es')
         response = es_client.describe_elasticsearch_domain(
             DomainName=domain_name
@@ -33,10 +32,19 @@ class AwsEsRecommendedCwAlarmsStack(core.Stack):
             print('Domains with ES version < 5.1 is not supported.')
             sys.exit()
 
+        ebs_volume_size = None
+
+        if response['EBSOptions']['EBSEnabled']:
+            ebs_volume_size = response['EBSOptions']['VolumeSize']
+
         node_count = response['ElasticsearchClusterConfig']['InstanceCount']
 
-        if response['ElasticsearchClusterConfig']['DedicatedMasterEnabled']:
+        is_dedicated_master_enabled = response['ElasticsearchClusterConfig']['DedicatedMasterEnabled']
+
+        if is_dedicated_master_enabled:
             node_count = node_count + response['ElasticsearchClusterConfig']['DedicatedMasterCount']
+
+        is_encryption_at_rest_enabled = response['EncryptionAtRestOptions']['Enabled']
 
         # Setting a Cloudwatch Alarm on the ClusterStatus.red metric
         self._RedClusterAlarm = cloudwatch.Alarm(
@@ -81,7 +89,7 @@ class AwsEsRecommendedCwAlarmsStack(core.Stack):
                 namespace="AWS/ES",
                 dimensions={"DomainName": domain_name, "ClientId": core.Stack.of(self).account},
             ),
-            threshold=2500,
+            threshold=ebs_volume_size * 0.25 * 1000, # 25% of the current volume size (in MB)
             comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_OR_EQUAL_TO_THRESHOLD,
             period=core.Duration.minutes(1),
             evaluation_periods=1,
@@ -174,70 +182,72 @@ class AwsEsRecommendedCwAlarmsStack(core.Stack):
             treat_missing_data=cloudwatch.TreatMissingData.MISSING,
         )
 
-        # Setting a Cloudwatch Alarm on the MasterCPUUtilization metric
-        self._MasterCPUUtilizationAlarm = cloudwatch.Alarm(
-            self,
-            domain_name + "-MasterCPUUtilizationAlarm",
-            metric=cloudwatch.Metric(
-                metric_name="MasterCPUUtilization",
-                namespace="AWS/ES",
-                dimensions={"DomainName": domain_name, "ClientId": core.Stack.of(self).account},
-            ),
-            threshold=50,
-            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-            period=core.Duration.minutes(15),
-            evaluation_periods=3,
-            statistic="avg",
-            treat_missing_data=cloudwatch.TreatMissingData.MISSING,
-        )
+        # Setting a Cloudwatch Alarm on the MasterCPUUtilization & MasterJVMMemoryPressure metrics 
+        # only if Dedicated Master is enabled
+        if is_dedicated_master_enabled:            
+            self._MasterCPUUtilizationAlarm = cloudwatch.Alarm(
+                self,
+                domain_name + "-MasterCPUUtilizationAlarm",
+                metric=cloudwatch.Metric(
+                    metric_name="MasterCPUUtilization",
+                    namespace="AWS/ES",
+                    dimensions={"DomainName": domain_name, "ClientId": core.Stack.of(self).account},
+                ),
+                threshold=50,
+                comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+                period=core.Duration.minutes(15),
+                evaluation_periods=3,
+                statistic="avg",
+                treat_missing_data=cloudwatch.TreatMissingData.MISSING,
+            )
 
-        # Setting a Cloudwatch Alarm on the MasterJVMMemoryPressure metric
-        self._MasterJVMMemoryPressureAlarm = cloudwatch.Alarm(
-            self,
-            domain_name + "-MasterJVMMemoryPressureAlarm",
-            metric=cloudwatch.Metric(
-                metric_name="MasterJVMMemoryPressure",
-                namespace="AWS/ES",
-                dimensions={"DomainName": domain_name, "ClientId": core.Stack.of(self).account},
-            ),
-            threshold=80,
-            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-            period=core.Duration.minutes(15),
-            evaluation_periods=1,
-            statistic="max",
-            treat_missing_data=cloudwatch.TreatMissingData.MISSING,
-        )
+            self._MasterJVMMemoryPressureAlarm = cloudwatch.Alarm(
+                self,
+                domain_name + "-MasterJVMMemoryPressureAlarm",
+                metric=cloudwatch.Metric(
+                    metric_name="MasterJVMMemoryPressure",
+                    namespace="AWS/ES",
+                    dimensions={"DomainName": domain_name, "ClientId": core.Stack.of(self).account},
+                ),
+                threshold=80,
+                comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+                period=core.Duration.minutes(15),
+                evaluation_periods=1,
+                statistic="max",
+                treat_missing_data=cloudwatch.TreatMissingData.MISSING,
+            )
 
-        # Setting a Cloudwatch Alarm on the KMSKeyError metric
-        self._KMSKeyErrorAlarm = cloudwatch.Alarm(
-            self,
-            domain_name + "-KMSKeyErrorAlarm",
-            metric=cloudwatch.Metric(
-                metric_name="KMSKeyError",
-                namespace="AWS/ES",
-                dimensions={"DomainName": domain_name, "ClientId": core.Stack.of(self).account},
-            ),
-            threshold=1,
-            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-            period=core.Duration.minutes(1),
-            evaluation_periods=1,
-            statistic="max",
-            treat_missing_data=cloudwatch.TreatMissingData.MISSING,
-        )
+        # Setting a Cloudwatch Alarm on the KMSKeyError & KMSKeyInaccessible metrics 
+        # only if Dedicated Master is enabled
+        if is_encryption_at_rest_enabled:
+            self._KMSKeyErrorAlarm = cloudwatch.Alarm(
+                self,
+                domain_name + "-KMSKeyErrorAlarm",
+                metric=cloudwatch.Metric(
+                    metric_name="KMSKeyError",
+                    namespace="AWS/ES",
+                    dimensions={"DomainName": domain_name, "ClientId": core.Stack.of(self).account},
+                ),
+                threshold=1,
+                comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+                period=core.Duration.minutes(1),
+                evaluation_periods=1,
+                statistic="max",
+                treat_missing_data=cloudwatch.TreatMissingData.MISSING,
+            )
 
-        # Setting a Cloudwatch Alarm on the KMSKeyInaccessible metric
-        self._KMSKeyInaccessibleAlarm = cloudwatch.Alarm(
-            self,
-            domain_name + "-KMSKeyInaccessibleAlarm",
-            metric=cloudwatch.Metric(
-                metric_name="KMSKeyInaccessible",
-                namespace="AWS/ES",
-                dimensions={"DomainName": domain_name, "ClientId": core.Stack.of(self).account},
-            ),
-            threshold=1,
-            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-            period=core.Duration.minutes(1),
-            evaluation_periods=1,
-            statistic="max",
-            treat_missing_data=cloudwatch.TreatMissingData.MISSING,
-        )
+            self._KMSKeyInaccessibleAlarm = cloudwatch.Alarm(
+                self,
+                domain_name + "-KMSKeyInaccessibleAlarm",
+                metric=cloudwatch.Metric(
+                    metric_name="KMSKeyInaccessible",
+                    namespace="AWS/ES",
+                    dimensions={"DomainName": domain_name, "ClientId": core.Stack.of(self).account},
+                ),
+                threshold=1,
+                comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+                period=core.Duration.minutes(1),
+                evaluation_periods=1,
+                statistic="max",
+                treat_missing_data=cloudwatch.TreatMissingData.MISSING,
+            )
