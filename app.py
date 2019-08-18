@@ -6,9 +6,9 @@ import os
 
 app = core.App()
 
-AwsEsRecommendedCwAlarmsStack(app, "aws-es-recommended-cw-alarms", os.environ["ES_DOMAIN_ARN"].split("/")[1], env={
-    "account": os.environ["CDK_DEFAULT_ACCOUNT"] or os.environ["ES_DOMAIN_ARN"].split(":")[4],
-    "region": os.environ["CDK_DEFAULT_REGION"] or os.environ["ES_DOMAIN_ARN"].split(":")[3],
+AwsEsRecommendedCwAlarmsStack(app, "aws-es-recommended-cw-alarms", os.environ["ES_DOMAIN_ARN"], env={
+    "account": os.environ["ES_DOMAIN_ARN"].split(":")[4] or os.environ["CDK_DEFAULT_ACCOUNT"],
+    "region": os.environ["ES_DOMAIN_ARN"].split(":")[3] or os.environ["CDK_DEFAULT_REGION"],
 })
 
 app.synth()
