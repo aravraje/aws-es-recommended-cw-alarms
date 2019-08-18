@@ -10,13 +10,9 @@ import boto3
 class AwsEsRecommendedCwAlarmsStack(core.Stack):
 
     _domain_name = _account = None
-
     _volume_size = _node_count = None
-
     _is_dedicated_master_enabled = _is_encryption_at_rest_enabled = False
-
     _sns_topic = None
-
     _instance_store_volume_size = {
         "m3.medium.elasticsearch": 4, "m3.large.elasticsearch": 32, "m3.xlarge.elasticsearch": 80,
         "m3.2xlarge.elasticsearch": 160, "r3.large.elasticsearch": 32, "r3.xlarge.elasticsearch": 80,
@@ -29,10 +25,8 @@ class AwsEsRecommendedCwAlarmsStack(core.Stack):
     def __init__(self, scope: core.Construct, id: str, domain_arn: str, aws_cli_profile: str = None, action_arn: str = None, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
-        self.configure(domain_arn, aws_cli_profile)
-
-        if action_arn:
-            self._sns_topic = sns.Topic.from_topic_arn(self, 'AlarmActionTopic', action_arn)
+        # Configuring certain aspects of the stack based on the ES domain details
+        self.configure(domain_arn, aws_cli_profile, action_arn)
 
         # Setting a Cloudwatch Alarm on the ClusterStatus.red metric
         self.create_cw_alarm_with_action(
@@ -97,19 +91,23 @@ class AwsEsRecommendedCwAlarmsStack(core.Stack):
             )
 
 
-    def configure(self, domain_arn, aws_cli_profile):
+    def configure(self, domain_arn, aws_cli_profile, action_arn):
         self._domain_name = domain_arn.split("/")[1]
         self._account = domain_arn.split(":")[4]
 
+        # Initializing the SNS topic if provided by the user
+        if action_arn:
+            self._sns_topic = sns.Topic.from_topic_arn(self, 'AlarmActionTopic', action_arn)
+
         # Getting the domain details via boto3
         profile_name = aws_cli_profile if aws_cli_profile else "default"
-
         session = boto3.Session(profile_name=profile_name)
         es_client = session.client("es")
         response = es_client.describe_elasticsearch_domain(DomainName=self._domain_name)[
             "DomainStatus"
         ]
 
+        # Deciding volume size based on EBS or Instance store
         if response["EBSOptions"]["EBSEnabled"]:
             self._volume_size = response["EBSOptions"]["VolumeSize"]
         else:
@@ -120,6 +118,9 @@ class AwsEsRecommendedCwAlarmsStack(core.Stack):
         self._is_dedicated_master_enabled = response["ElasticsearchClusterConfig"][
             "DedicatedMasterEnabled"
         ]
+
+        # Node count is usually the num. of Data nodes unless Dedicated Master is enabled; 
+        # Otherwise, it's num. of Data nodes + Dedicated Master nodes
         self._node_count = response["ElasticsearchClusterConfig"]["InstanceCount"]
         if self._is_dedicated_master_enabled:
             self._node_count += response["ElasticsearchClusterConfig"]["DedicatedMasterCount"]
@@ -128,6 +129,7 @@ class AwsEsRecommendedCwAlarmsStack(core.Stack):
 
 
     def create_cw_alarm_with_action(self, metric_name, threshold, comparison_operator, period, evaluation_periods, statistic, sns_topic=None) -> None:
+        # Creating a CW Alarm for the provided metric
         self._cw_alarm = cloudwatch.Alarm(
             self,
             self._domain_name + f"-{metric_name}Alarm",
@@ -144,5 +146,6 @@ class AwsEsRecommendedCwAlarmsStack(core.Stack):
             treat_missing_data=cloudwatch.TreatMissingData.MISSING,
         )
 
+        # If SNS topic is provided by the user, setting the Alarm action to that topic
         if sns_topic:
             self._cw_alarm.add_alarm_action(cloudwatch_actions.SnsAction(sns_topic))
