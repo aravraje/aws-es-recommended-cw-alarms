@@ -1,0 +1,50 @@
+#!/usr/bin/env python
+'''
+A Python helper program to populate the cdk.json file with the below values as arguments:
+STACK_NAME (optional), ES_DOMAIN_ARN (required), AWS_PROFILE (optional), SNS_TOPIC_ARN_LIST (optional)
+'''
+
+import argparse
+
+parser = argparse.ArgumentParser()
+required = parser.add_argument_group('required arguments')
+required.add_argument(
+    '-es_domain_arn', 
+    '--es_domain_arn', 
+    help='The Elasticsearch domain ARN for which the CloudWatch Recommended Alarms should be deployed.', 
+    required=True
+)
+parser.add_argument(
+    '-cfn_stack_name', 
+    '--cfn_stack_name', 
+    help='Name of the CloudFormation stack to create. (Default: aws-es-recommended-cw-alarms-stack)', 
+    default='aws-es-recommended-cw-alarms-stack'
+)
+parser.add_argument(
+    '-aws_profile', 
+    '--aws_profile', 
+    help='The AWS CLI profile to use for making the AWS ES DescribeElasticsearchDomain API call. (Default: [default])', 
+    default='default'
+)
+parser.add_argument(
+    '-sns_topic_arn_list', 
+    '--sns_topic_arn_list', 
+    help='One or more SNS Topic ARNs (comma separated) to which notifications will be sent whenever the CloudWatch Alarms get triggered.', 
+    default=[]
+)
+
+args = parser.parse_args()
+
+try:
+    with open('cdk.json', 'r') as file:
+        contents = file.read()
+
+    head, sep, tail = contents.partition('.py')
+    contents = head + sep + tail[tail.index('"')::]
+    contents = contents.replace('.py', f'.py {args.cfn_stack_name} {args.es_domain_arn} {args.aws_profile} {args.sns_topic_arn_list}')
+
+    with open('cdk.json', 'w') as file:
+        file.write(contents)
+
+except EnvironmentError as e:
+    print(f'An exception occurred while reading from / writing to the file - cdk.json: {e}')

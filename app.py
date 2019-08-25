@@ -3,18 +3,21 @@
 from aws_cdk import core
 from aws_es_recommended_cw_alarms.aws_es_recommended_cw_alarms_stack import AwsEsRecommendedCwAlarmsStack
 import os
+import sys
 
 app = core.App()
 
+CFN_STACK_NAME, ES_DOMAIN_ARN, AWS_PROFILE, SNS_TOPIC_LIST_ARN = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4].split(",")
+
 AwsEsRecommendedCwAlarmsStack(
     app, 
-    "aws-es-recommended-cw-alarms", 
-    os.environ["ES_DOMAIN_ARN"], 
-    'araviraj', 
-    ['arn:aws:sns:us-east-1:854759189838:testTopic', 'arn:aws:sns:us-east-1:854759189838:newTopic'], 
+    CFN_STACK_NAME,
+    ES_DOMAIN_ARN, 
+    AWS_PROFILE, 
+    SNS_TOPIC_LIST_ARN, 
     env={
-        "account": os.environ["ES_DOMAIN_ARN"].split(":")[4] or os.environ["CDK_DEFAULT_ACCOUNT"],
-        "region": os.environ["ES_DOMAIN_ARN"].split(":")[3] or os.environ["CDK_DEFAULT_REGION"],
+        "account": ES_DOMAIN_ARN.split(":")[4] or os.environ["CDK_DEFAULT_ACCOUNT"],
+        "region": ES_DOMAIN_ARN.split(":")[3] or os.environ["CDK_DEFAULT_REGION"],
     }
 )
 
