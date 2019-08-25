@@ -16,8 +16,8 @@ AwsEsRecommendedCwAlarmsStack(
     AWS_PROFILE, 
     SNS_TOPIC_LIST_ARN, 
     env={
-        "account": ES_DOMAIN_ARN.split(":")[4] or os.environ["CDK_DEFAULT_ACCOUNT"],
-        "region": ES_DOMAIN_ARN.split(":")[3] or os.environ["CDK_DEFAULT_REGION"],
+        "account": ES_DOMAIN_ARN.split(":")[4],
+        "region": ES_DOMAIN_ARN.split(":")[3],
     }
 )
 

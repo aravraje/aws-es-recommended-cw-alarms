@@ -1,3 +1,4 @@
+import boto3
 import requests
 from requests_aws4auth import AWS4Auth
 import os
@@ -48,14 +49,18 @@ def lambda_handler(event, context):
     send_to_es(host, cw_metric, METRIC_TO_CAT_API_MAPPING[cw_metric], awsauth, headers)
 
 def send_to_es(host, cw_metric, apis, awsauth, headers):
+    cat_api_output = ''
     for api in apis:
         try:
             r = requests.get(host + api, auth=awsauth, headers=headers)
             if r.status_code == 200:
-                print("===================================")
-                print(f"Domain Endpoint: {os.environ['DOMAIN_ENDPOINT']}\nMetric Name: {cw_metric}\nAPI: {api}")
-                print("===================================")
-                print(r.text)
+                cat_api_output += "=" * 25 + "\n"
+                cat_api_output += f"Domain Endpoint: {os.environ['DOMAIN_ENDPOINT']}\nMetric Name: {cw_metric}\nAPI: {api}" + "\n"
+                cat_api_output += "=" * 25 + "\n"
+                cat_api_output += r.text + "\n"
         
         except Exception as e:
             print(e)
+    
+    if cat_api_output:
+        print(cat_api_output)

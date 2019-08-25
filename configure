@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''
 A Python helper program to populate the cdk.json file with the below values as arguments:
 STACK_NAME (optional), ES_DOMAIN_ARN (required), AWS_PROFILE (optional), SNS_TOPIC_ARN_LIST (optional)
