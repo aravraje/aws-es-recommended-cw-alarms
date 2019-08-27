@@ -53,6 +53,19 @@ class AwsEsRecommendedCwAlarmsStack(core.Stack):
         # If more than one SNS topic is provided, we will attach just the first SNS topic as the trigger
         self._sns_topic = sns.Topic.from_topic_arn(self, sns_topic_arn_list[0].split(":")[-1], sns_topic_arn_list[0])
 
+        # Adding an SNS trigger to the Lambda function
         self._lambda_func.add_event_source(
             _lambda_event_source.SnsEventSource(self._sns_topic)
+        )
+
+        # Adding SNS Publish permission since the Lambda function is configured to post 
+        # the output of _cat APIs to the same SNS topic that triggers the function
+        self._sns_publish_policy_statement = iam.PolicyStatement(
+            actions=['SNS:Publish'],
+            effect=iam.Effect.ALLOW,
+            resources=[self._sns_topic.topic_arn]
+        )
+
+        self._lambda_func.add_to_role_policy(
+            self._sns_publish_policy_statement
         )

@@ -63,6 +63,10 @@ class AwsEsRecommendedCwAlarms(core.Construct):
             "CPUUtilization", 80, cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD, 15, 3, "avg", self._sns_topic_list
         )
 
+        # self.create_cw_alarm_with_action(
+        #     "CPUUtilization", 80, cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD, 1, 1, "max", self._sns_topic_list
+        # )
+
         # Setting a Cloudwatch Alarm on the JVMMemoryPressure metric
         self.create_cw_alarm_with_action(
             "JVMMemoryPressure", 80, cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD, 5, 3, "max", self._sns_topic_list
