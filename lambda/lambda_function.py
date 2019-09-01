@@ -37,19 +37,20 @@ METRIC_TO_CAT_API_MAPPING = {
 }
 
 def lambda_handler(event, context):
-    sns_topic_arn = event["Records"][0]["Sns"]["TopicArn"]
-    sns_message = json.loads(event["Records"][0]["Sns"]["Message"])
-    cw_metric = sns_message["Trigger"]["MetricName"]
+    if not "IS_CW_ALARM" in event["Records"][0]["Sns"]["MessageAttributes"]:
+        sns_topic_arn = event["Records"][0]["Sns"]["TopicArn"]
+        sns_message = json.loads(event["Records"][0]["Sns"]["Message"])
+        cw_metric = sns_message["Trigger"]["MetricName"]
 
-    host = 'https://' + os.environ['DOMAIN_ENDPOINT'] + '/'
-    region = os.environ['DOMAIN_ARN'].split(":")[3]
-    service = os.environ['DOMAIN_ARN'].split(":")[2]
-    awsauth = AWS4Auth(os.environ['AWS_ACCESS_KEY_ID'], os.environ['AWS_SECRET_ACCESS_KEY'], region, service, session_token=os.environ['AWS_SESSION_TOKEN'])
-    headers = {"Content-Type": "application/json"}
+        host = 'https://' + os.environ['DOMAIN_ENDPOINT'] + '/'
+        region = os.environ['DOMAIN_ARN'].split(":")[3]
+        service = os.environ['DOMAIN_ARN'].split(":")[2]
+        awsauth = AWS4Auth(os.environ['AWS_ACCESS_KEY_ID'], os.environ['AWS_SECRET_ACCESS_KEY'], region, service, session_token=os.environ['AWS_SESSION_TOKEN'])
+        headers = {"Content-Type": "application/json"}
 
-    send_to_es(host, cw_metric, METRIC_TO_CAT_API_MAPPING[cw_metric], awsauth, headers, sns_topic_arn)
+        send_to_es(host, cw_metric, METRIC_TO_CAT_API_MAPPING[cw_metric], awsauth, headers, sns_topic_arn)
 
-def send_to_es(host, cw_metric, apis, awsauth, headers, sns_topic_arn=None):
+def send_to_es(host, cw_metric, apis, awsauth, headers, sns_topic_arn):
     cat_api_output = ''
     for api in apis:
         try:
@@ -74,6 +75,12 @@ def send_to_es(host, cw_metric, apis, awsauth, headers, sns_topic_arn=None):
             sns_response = sns.publish(
                 TopicArn=sns_topic_arn,
                 Message=cat_api_output,
+                MessageAttributes={
+                    'IS_CW_ALARM': {
+                        'DataType': 'String',
+                        'StringValue': 'False'
+                    }
+                }
             )
 
             if 'MessageId' in sns_response:
