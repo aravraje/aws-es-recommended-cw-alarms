@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 '''
 A Python helper program to populate the cdk.json file with the below values as arguments:
-STACK_NAME (optional), ES_DOMAIN_ARN (required), AWS_PROFILE (optional), SNS_TOPIC_ARN_LIST (optional)
+ES_DOMAIN_ARN (required), STACK_NAME (optional), AWS_PROFILE (optional), CW_SNS_ARN_LIST (optional), ENABLE_ES_API_OUTPUT (optional), ES_API_OUTPUT_SNS_ARN (optional)
 '''
 
 import argparse
@@ -11,29 +11,56 @@ required = parser.add_argument_group('required arguments')
 required.add_argument(
     '-es_domain_arn', 
     '--es_domain_arn', 
-    help='The Elasticsearch domain ARN for which the CloudWatch Recommended Alarms should be deployed.', 
+    help='The Elasticsearch domain ARN for which the CloudWatch Recommended Alarms should be deployed', 
     required=True
 )
 parser.add_argument(
     '-cfn_stack_name', 
     '--cfn_stack_name', 
-    help='Name of the CloudFormation stack to create. (Default: aws-es-recommended-cw-alarms-stack)', 
+    help='''Name of the CloudFormation stack to create.
+            (Default: aws-es-recommended-cw-alarms-stack)''', 
     default='aws-es-recommended-cw-alarms-stack'
 )
 parser.add_argument(
     '-aws_profile', 
     '--aws_profile', 
-    help='The AWS CLI profile to use for making the AWS ES DescribeElasticsearchDomain API call. (Default: [default])', 
+    help='''The AWS CLI profile to use for making the AWS ES DescribeElasticsearchDomain API call.
+            (Default: default)''', 
     default='default'
 )
 parser.add_argument(
-    '-sns_topic_arn_list', 
-    '--sns_topic_arn_list', 
-    help='One or more SNS Topic ARNs (comma separated) to which notifications will be sent whenever the CloudWatch Alarms get triggered.', 
-    default=[]
+    '-cw_trigger_sns_arn_list', 
+    '--cw_trigger_sns_arn_list', 
+    help='''One or more SNS Topic ARNs (comma separated) to which notifications will be sent whenever the CloudWatch Alarms get triggered.
+            (Default: None)''', 
+    default=None
+)
+parser.add_argument(
+    '-enable_es_api_output',
+    '--enable_es_api_output',
+    help='''Setting this to true will make the CloudWatch Alarms trigger a Lambda function using the first SNS topic passed via the 'cw_trigger_sns_arn_list' argument. 
+            The Lambda function is pre-coded to invoke ES _cat, _cluster, _node APIs (on a best-effort basis) corresponding to the triggered Alarm.
+            Using the API output, it may be possible to find out why the CloudWatch Alarm was triggered in the first place.
+            (Default: false)''',
+    type=lambda x: (str(x).lower() in ['true', 't', 'yes', 'y', '1']),
+    default=False
+)
+parser.add_argument(
+    '-es_api_output_sns_arn',
+    '--es_api_output_sns_arn',
+    help='''If ES API output is enabled, an SNS Topic ARN can be passed to which Lambda will send the output of ES _cat, _cluster, _node APIs. 
+            To save Lambda costs, it's highly recommended not to pass the same SNS Topic ARN that's configured as the trigger for the CloudWatch Alarms (cw_trigger_sns_arn_list).
+            (Default: None)''',
+    default=None
 )
 
 args = parser.parse_args()
+
+if args.enable_es_api_output and not args.cw_trigger_sns_arn_list:
+    parser.error("In order to enable the ES API output, it's required to pass at least 1 SNS Topic ARN via cw_trigger_sns_arn_list argument")
+
+if args.es_api_output_sns_arn and not args.enable_es_api_output:
+    parser.error("Argument 'es_api_output_sns_arn' cannot be used without setting 'enable_es_api_output' to true")
 
 try:
     with open('cdk.json', 'r') as file:
@@ -41,10 +68,10 @@ try:
 
     head, sep, tail = contents.partition('.py')
     contents = head + sep + tail[tail.index('"')::]
-    contents = contents.replace('.py', f'.py {args.cfn_stack_name} {args.es_domain_arn} {args.aws_profile} {args.sns_topic_arn_list}')
+    contents = contents.replace('.py', f'.py {args.cfn_stack_name} {args.es_domain_arn} {args.aws_profile} {args.cw_trigger_sns_arn_list} {args.enable_es_api_output} {args.es_api_output_sns_arn}')
 
     with open('cdk.json', 'w') as file:
         file.write(contents)
 
 except EnvironmentError as e:
-    print(f'An exception occurred while reading from / writing to the file - cdk.json: {e}')
+    print(f'An exception occurred while reading from (or) writing to the file - \'cdk.json\': {e}')

@@ -5,7 +5,7 @@ import os
 import json
 from time import sleep
 
-METRIC_TO_CAT_API_MAPPING = {
+METRIC_TO_API_MAPPING = {
     "ClusterStatus.red": [
         "_cluster/health?pretty", 
         "_cluster/allocation/explain?format=json", 
@@ -48,23 +48,30 @@ def lambda_handler(event, context):
         awsauth = AWS4Auth(os.environ['AWS_ACCESS_KEY_ID'], os.environ['AWS_SECRET_ACCESS_KEY'], region, service, session_token=os.environ['AWS_SESSION_TOKEN'])
         headers = {"Content-Type": "application/json"}
 
-        send_to_es(host, cw_metric, METRIC_TO_CAT_API_MAPPING[cw_metric], awsauth, headers, sns_topic_arn)
+        send_to_es(host, cw_metric, METRIC_TO_API_MAPPING[cw_metric], awsauth, headers, sns_topic_arn)
 
 def send_to_es(host, cw_metric, apis, awsauth, headers, sns_topic_arn):
-    cat_api_output = ''
+    api_output = {'apis': []}
     for api in apis:
+        out = {}
+        out['domain_endpoint'] = os.environ['DOMAIN_ENDPOINT']
+        out['metric_name'] = cw_metric
+        out['api'] = api
         try:
-            r = requests.get(host + api, auth=awsauth, headers=headers)
-            if r.status_code == 200:
-                cat_api_output += "=" * 25 + "\n"
-                cat_api_output += f"Domain Endpoint: {os.environ['DOMAIN_ENDPOINT']}\nMetric Name: {cw_metric}\nAPI: {api}" + "\n"
-                cat_api_output += "=" * 25 + "\n"
-                cat_api_output += r.text + "\n"
-        
+            r = requests.get(host + api, auth=awsauth, headers=headers, timeout=30)
+            r.raise_for_status()
+            out['response'] = r.text
+
         except Exception as e:
-            print(f"An unknown error occurred while invoking the _cat API - {api}: {e}")
-    
-    if cat_api_output:
+            # print(f"An unknown error occurred while invoking the API - {api}: {e}")
+            out['exception'] = e
+
+        finally:
+            print(out)
+
+        api_output['apis'].append(out)
+
+    if api_output['apis']:
         sns = boto3.client('sns')
         max_retries = 3
         num_retries = 0
@@ -74,7 +81,7 @@ def send_to_es(host, cw_metric, apis, awsauth, headers, sns_topic_arn):
         while num_retries <= max_retries:
             sns_response = sns.publish(
                 TopicArn=sns_topic_arn,
-                Message=cat_api_output,
+                Message=api_output,
                 MessageAttributes={
                     'IS_CW_ALARM': {
                         'DataType': 'String',
