@@ -6,6 +6,7 @@ from aws_cdk import (
     aws_lambda_event_sources as _lambda_event_source,
     aws_iam as iam,
     aws_sns as sns,
+    aws_ec2 as ec2,
 )
 import boto3
 
@@ -14,8 +15,9 @@ class AwsEsRecommendedCwAlarms(core.Construct):
 
     _account = _domain_name = _domain_endpoint = None
     _volume_size = _node_count = None
-    _is_dedicated_master_enabled = _is_encryption_at_rest_enabled = False
-    _sns_topic_list = []
+    _is_dedicated_master_enabled = _is_encryption_at_rest_enabled = _is_vpc_domain = False
+    _vpc = _security_group = None
+    _subnets = _azs = _sns_topic_list = []
     _instance_store_volume_size = {
         "m3.medium.elasticsearch": 4,
         "m3.large.elasticsearch": 32,
@@ -192,18 +194,63 @@ class AwsEsRecommendedCwAlarms(core.Construct):
         
         if enable_es_api_output:
             # Creating a Lambda function to invoke ES _cat APIs corresponding to the triggered CW Alarm
-            self._lambda_func = _lambda.Function(
-                self,
-                "CWAlarmHandler",
-                runtime=_lambda.Runtime.PYTHON_3_7,
-                code=_lambda.Code.asset("lambda"),
-                handler="lambda_function.lambda_handler",
-                timeout=core.Duration.minutes(1),
-                environment={
-                    "DOMAIN_ENDPOINT": self._domain_endpoint, 
-                    "DOMAIN_ARN": domain_arn
-                },
-            )
+            if self._is_vpc_domain:
+                self._lambda_vpc = ec2.Vpc.from_lookup(
+                    self,
+                    self._vpc,
+                    vpc_id=self._vpc
+                )
+
+                self._lambda_subnets = [
+                    ec2.Subnet.from_subnet_attributes(
+                        self,
+                        self._subnets[i],
+                        subnet_id=self._subnets[i],
+                        availability_zone=self._azs[i]
+                    )
+                    for i in range(0, len(self._subnets))
+                ]
+
+                self._lambda_security_group = ec2.SecurityGroup.from_security_group_id(
+                    self,
+                    self._security_group,
+                    security_group_id=self._security_group
+                )
+
+                self._lambda_security_group.add_ingress_rule(
+                    ec2.Peer().prefix_list(self._security_group),
+                    ec2.Port.tcp(443),
+                    description="Ingress rule that allows the aws_es_cw_alarms Lambda to talk to VPC based ES domain"
+                )
+
+                self._lambda_func = _lambda.Function(
+                    self,
+                    "CWAlarmHandler",
+                    runtime=_lambda.Runtime.PYTHON_3_7,
+                    code=_lambda.Code.asset("lambda"),
+                    handler="lambda_function.lambda_handler",
+                    timeout=core.Duration.minutes(1),
+                    environment={
+                        "DOMAIN_ENDPOINT": self._domain_endpoint, 
+                        "DOMAIN_ARN": domain_arn
+                    },
+                    vpc=self._lambda_vpc,
+                    vpc_subnets=ec2.SubnetSelection(subnets=self._lambda_subnets),
+                    security_group=self._lambda_security_group
+                )
+            else:
+                self._lambda_func = _lambda.Function(
+                    self,
+                    "CWAlarmHandler",
+                    runtime=_lambda.Runtime.PYTHON_3_7,
+                    code=_lambda.Code.asset("lambda"),
+                    handler="lambda_function.lambda_handler",
+                    timeout=core.Duration.minutes(1),
+                    environment={
+                        "DOMAIN_ENDPOINT": self._domain_endpoint, 
+                        "DOMAIN_ARN": domain_arn
+                    },
+                )
 
             # A Custom IAM Policy statement to grant _cat API access to the Lambda function
             self._es_policy_statement = iam.PolicyStatement(
@@ -221,7 +268,6 @@ class AwsEsRecommendedCwAlarms(core.Construct):
             )
 
             if es_api_output_sns_arn:
-
                 self._lambda_func.add_environment("SNS_TOPIC_ARN", es_api_output_sns_arn)
 
                 # Adding SNS Publish permission since the Lambda function is configured to post
@@ -255,7 +301,15 @@ class AwsEsRecommendedCwAlarms(core.Construct):
             DomainName=self._domain_name
         )["DomainStatus"]
 
-        self._domain_endpoint = response["Endpoint"]
+        if "VPCOptions" in response:
+            self._is_vpc_domain = True
+            self._domain_endpoint = response["Endpoints"]["vpc"]
+            self._vpc = response["VPCOptions"]["VPCId"]
+            self._subnets = response["VPCOptions"]["SubnetIds"]
+            self._azs = response["VPCOptions"]["AvailabilityZones"]
+            self._security_group = response["VPCOptions"]["SecurityGroupIds"][0]
+        else:
+            self._domain_endpoint = response["Endpoint"]
 
         # Deciding volume size based on EBS or Instance store
         if response["EBSOptions"]["EBSEnabled"]:
