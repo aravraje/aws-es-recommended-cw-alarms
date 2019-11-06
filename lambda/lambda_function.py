@@ -25,7 +25,7 @@ METRIC_TO_API_MAPPING = {
         "_nodes/stats/jvm?pretty",
     ],
     "CPUUtilization": [
-        "_nodes/hot_threads",
+        "_nodes/hot_threads", # instead of doing hot_threads from all nodes, do only from overloaded nodes
         "_cat/thread_pool?v",
         "_nodes/stats/os?pretty", 
     ],
@@ -37,18 +37,19 @@ METRIC_TO_API_MAPPING = {
 }
 
 def lambda_handler(event, context):
-    if not "IS_CW_ALARM" in event["Records"][0]["Sns"]["MessageAttributes"]:
-        sns_topic_arn = event["Records"][0]["Sns"]["TopicArn"]
-        sns_message = json.loads(event["Records"][0]["Sns"]["Message"])
-        cw_metric = sns_message["Trigger"]["MetricName"]
+    sns_message = json.loads(event["Records"][0]["Sns"]["Message"])
+    cw_metric = sns_message["Trigger"]["MetricName"]
 
-        host = 'https://' + os.environ['DOMAIN_ENDPOINT'] + '/'
-        region = os.environ['DOMAIN_ARN'].split(":")[3]
-        service = os.environ['DOMAIN_ARN'].split(":")[2]
-        awsauth = AWS4Auth(os.environ['AWS_ACCESS_KEY_ID'], os.environ['AWS_SECRET_ACCESS_KEY'], region, service, session_token=os.environ['AWS_SESSION_TOKEN'])
-        headers = {"Content-Type": "application/json"}
+    host = 'https://' + os.environ['DOMAIN_ENDPOINT'] + '/'
+    region = os.environ['DOMAIN_ARN'].split(":")[3]
+    service = os.environ['DOMAIN_ARN'].split(":")[2]
+    awsauth = AWS4Auth(os.environ['AWS_ACCESS_KEY_ID'], os.environ['AWS_SECRET_ACCESS_KEY'], region, service, session_token=os.environ['AWS_SESSION_TOKEN'])
+    headers = {"Content-Type": "application/json"}
 
-        send_to_es(host, cw_metric, METRIC_TO_API_MAPPING[cw_metric], awsauth, headers, sns_topic_arn)
+    if 'SNS_TOPIC_ARN' in os.environ:
+        sns_topic_arn = os.environ['SNS_TOPIC_ARN']
+
+    send_to_es(host, cw_metric, METRIC_TO_API_MAPPING[cw_metric], awsauth, headers, sns_topic_arn=None)
 
 def send_to_es(host, cw_metric, apis, awsauth, headers, sns_topic_arn):
     api_output = {'apis': []}
@@ -71,7 +72,7 @@ def send_to_es(host, cw_metric, apis, awsauth, headers, sns_topic_arn):
 
         api_output['apis'].append(out)
 
-    if api_output['apis']:
+    if api_output['apis'] and sns_topic_arn:
         sns = boto3.client('sns')
         max_retries = 3
         num_retries = 0
@@ -82,12 +83,6 @@ def send_to_es(host, cw_metric, apis, awsauth, headers, sns_topic_arn):
             sns_response = sns.publish(
                 TopicArn=sns_topic_arn,
                 Message=api_output,
-                MessageAttributes={
-                    'IS_CW_ALARM': {
-                        'DataType': 'String',
-                        'StringValue': 'False'
-                    }
-                }
             )
 
             if 'MessageId' in sns_response:

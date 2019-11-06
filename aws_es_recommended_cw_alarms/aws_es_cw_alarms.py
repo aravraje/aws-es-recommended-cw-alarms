@@ -229,7 +229,7 @@ class AwsEsRecommendedCwAlarms(core.Construct):
                     runtime=_lambda.Runtime.PYTHON_3_7,
                     code=_lambda.Code.asset("lambda"),
                     handler="lambda_function.lambda_handler",
-                    timeout=core.Duration.minutes(1),
+                    timeout=core.Duration.minutes(15),
                     environment={
                         "DOMAIN_ENDPOINT": self._domain_endpoint, 
                         "DOMAIN_ARN": domain_arn
@@ -245,7 +245,7 @@ class AwsEsRecommendedCwAlarms(core.Construct):
                     runtime=_lambda.Runtime.PYTHON_3_7,
                     code=_lambda.Code.asset("lambda"),
                     handler="lambda_function.lambda_handler",
-                    timeout=core.Duration.minutes(1),
+                    timeout=core.Duration.minutes(15),
                     environment={
                         "DOMAIN_ENDPOINT": self._domain_endpoint, 
                         "DOMAIN_ARN": domain_arn
