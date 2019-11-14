@@ -17,7 +17,7 @@ class AwsEsRecommendedCwAlarms(core.Construct):
     _volume_size = _node_count = None
     _is_dedicated_master_enabled = _is_encryption_at_rest_enabled = _is_vpc_domain = False
     _vpc = _security_group = None
-    _subnets = _azs = _sns_topic_list = []
+    _sns_topic_list = []
     _instance_store_volume_size = {
         "m3.medium.elasticsearch": 4,
         "m3.large.elasticsearch": 32,
@@ -201,26 +201,15 @@ class AwsEsRecommendedCwAlarms(core.Construct):
                     vpc_id=self._vpc
                 )
 
-                self._lambda_subnets = [
-                    ec2.Subnet.from_subnet_attributes(
-                        self,
-                        self._subnets[i],
-                        subnet_id=self._subnets[i],
-                        availability_zone=self._azs[i]
-                    )
-                    for i in range(0, len(self._subnets))
-                ]
-
                 self._lambda_security_group = ec2.SecurityGroup.from_security_group_id(
                     self,
                     self._security_group,
                     security_group_id=self._security_group
                 )
 
-                self._lambda_security_group.add_ingress_rule(
-                    ec2.Peer().prefix_list(self._security_group),
-                    ec2.Port.tcp(443),
-                    description="Ingress rule that allows the aws_es_cw_alarms Lambda to talk to VPC based ES domain"
+                self._lambda_security_group.connections.allow_internally(
+                    port_range=ec2.Port.tcp(443),
+                    description="Ingress rule that allows the aws_es_cw_alarms Lambda to talk to a VPC based ES domain"
                 )
 
                 self._lambda_func = _lambda.Function(
@@ -235,7 +224,7 @@ class AwsEsRecommendedCwAlarms(core.Construct):
                         "DOMAIN_ARN": domain_arn
                     },
                     vpc=self._lambda_vpc,
-                    vpc_subnets=ec2.SubnetSelection(subnets=self._lambda_subnets),
+                    vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE),
                     security_group=self._lambda_security_group
                 )
             else:
@@ -305,8 +294,6 @@ class AwsEsRecommendedCwAlarms(core.Construct):
             self._is_vpc_domain = True
             self._domain_endpoint = response["Endpoints"]["vpc"]
             self._vpc = response["VPCOptions"]["VPCId"]
-            self._subnets = response["VPCOptions"]["SubnetIds"]
-            self._azs = response["VPCOptions"]["AvailabilityZones"]
             self._security_group = response["VPCOptions"]["SecurityGroupIds"][0]
         else:
             self._domain_endpoint = response["Endpoint"]

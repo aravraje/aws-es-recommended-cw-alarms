@@ -3,3 +3,4 @@
 cdk.out
 __pycache__
 .vscode
+cdk.context.json
