@@ -25,12 +25,12 @@ METRIC_TO_API_MAPPING = {
         "_nodes/stats/jvm?pretty",
     ],
     "CPUUtilization": [
-        "_nodes/hot_threads",  # instead of doing hot_threads from all nodes, do only from overloaded nodes
-        "_cat/thread_pool?v",
-        "_nodes/stats/os?pretty",
+        "_cat/nodes?v&s=cpu:desc",
+        "_nodes/nodeid/hot_threads"
     ],
     "JVMMemoryPressure": [
         "_nodes/stats/jvm?pretty"
+        "_cat/fielddata?v"
     ],
     # for master, add cat pending tasks API and master API
 }
