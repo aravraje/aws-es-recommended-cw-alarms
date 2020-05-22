@@ -1,7 +1,7 @@
 from aws_cdk import (
     core,
 )
-from aws_es_cw_alarms import AwsEsRecommendedCwAlarms
+from .aws_es_cw_alarms import AwsEsRecommendedCwAlarms
 import boto3
 
 
