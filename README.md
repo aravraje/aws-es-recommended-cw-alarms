@@ -63,6 +63,8 @@ $ pip install -r requirements.txt
 ```
 $ ./configure -es_domain_arn <ES_DOMAIN_ARN> [-cfn_stack_name <CFN_STACK_NAME> -aws_profile <AWS_CLI_PROFILE> -cw_trigger_sns_arn_list <CW_TRIGGER_SNS_ARN_LIST> -enable_es_api_output <ENABLE_ES_API_OUTPUT> -es_api_output_sns_arn <ES_API_OUTPUT_SNS_ARN>]
 ```
+  - NOTE: Please ensure that the AWS_CLI_PROFILE used here has DescribeElasticsearchDomain permission on the ES Domain.
+
 > Using the helper script "configure", you can do other customizations to the solution (if required) apart from just configuring it with the AWS ES Domain ARN. For a complete list of customizations available to you, please invoke the below command:
 > ```
 > $ ./configure --help
@@ -75,4 +77,4 @@ $ ./configure -es_domain_arn <ES_DOMAIN_ARN> [-cfn_stack_name <CFN_STACK_NAME> -
 ```
 $ cdk deploy [--profile aws_cli_profile]
 ```
-  - This is an environment-agnostic solution and when using "cdk deploy" to deploy environment-agnostic solutions, the AWS CDK CLI uses the specified AWS CLI profile (or the "default" profile, if none is specified) to determine the AWS Account and Region for deploying the solution.
+  - NOTE: The aws_cli_profile used here should be the same as the one that was used when configuring the solution via "configure" helper script.
