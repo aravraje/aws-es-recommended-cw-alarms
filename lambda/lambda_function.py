@@ -123,7 +123,7 @@ def send_to_es(host, cw_metric, apis, awsauth, headers, sns_topic_arn=None):
         while num_retries < max_retries:
             sns_response = sns.publish(
                 TopicArn=sns_topic_arn,
-                Message=api_output,
+                Message=json.dumps(api_output),
                 MessageAttributes={
                     "IS_CW_ALARM": {"DataType": "String", "StringValue": "False"}
                 },
