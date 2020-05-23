@@ -1,7 +1,7 @@
 
 # AWS ES Recommended CW Alarms
 
-An AWS CDK (Python) based solution to implement the Recommended CloudWatch Alarms for AWS Elasticsearch (https://amzn.to/2NltKqy) in any AWS account. The solution also includes a Lambda function that is pre-coded to invoke ES _cat, _cluster, _node APIs (on a best-effort basis) corresponding to the triggered CloudWatch Alarm.
+An AWS CDK (Python) based solution to implement the Recommended CloudWatch Alarms for AWS Elasticsearch (https://amzn.to/2NltKqy) in any AWS account. The solution also includes a Lambda function that is pre-coded to invoke ES _cat, _cluster, _nodes APIs (on a best-effort basis) corresponding to the triggered CloudWatch Alarm.
 
 
 ## How to deploy?
