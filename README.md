@@ -64,9 +64,9 @@ $ pip install -r requirements.txt
 $ ./configure -es_domain_arn <ES_DOMAIN_ARN> [-cfn_stack_name <CFN_STACK_NAME> -aws_profile <AWS_CLI_PROFILE> -cw_trigger_sns_arn_list <CW_TRIGGER_SNS_ARN_LIST> -enable_es_api_output <ENABLE_ES_API_OUTPUT> -es_api_output_sns_arn <ES_API_OUTPUT_SNS_ARN>]
 ```
 > Using the helper script "configure", you can do other customizations to the solution (if required) apart from just configuring it with the AWS ES Domain ARN. For a complete list of customizations available to you, please invoke the below command:
-```
-$ ./configure --help
-```
+> ```
+> $ ./configure --help
+> ```
 
 6. After configuring the solution, you can deploy it using "cdk deploy" CDK CLI command
 
