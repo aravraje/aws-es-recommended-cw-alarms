@@ -58,7 +58,17 @@ $ source .env/bin/activate
 $ pip install -r requirements.txt
 ```
 
-5. At this point, you can deploy the solution using "cdk deploy" CDK CLI command
+5. Before deploying the solution, it needs to be configured with the AWS ES Domain ARN for which the Recommended CW Alarms should be created. To assist with this configuration, an helper script called "configure" is provided which has the below syntax:
+
+```
+$ ./configure -es_domain_arn <ES_DOMAIN_ARN> [-cfn_stack_name <CFN_STACK_NAME> -aws_profile <AWS_CLI_PROFILE> -cw_trigger_sns_arn_list <CW_TRIGGER_SNS_ARN_LIST> -enable_es_api_output <ENABLE_ES_API_OUTPUT> -es_api_output_sns_arn <ES_API_OUTPUT_SNS_ARN>]
+```
+> Using the helper script "configure", you can do other customizations to the solution (if required) apart from just configuring it with the AWS ES Domain ARN. For a complete list of customizations available to you, please invoke the below command:
+```
+$ ./configure --help
+```
+
+6. After configuring the solution, you can deploy it using "cdk deploy" CDK CLI command
 
 > NOTE: If this is your first time deploying a CDK app in the given AWS Account and Region, you must bootstrap your AWS environment for CDK by invoking "cdk bootstrap" CDK CLI command before running the "cdk deploy" command.
 

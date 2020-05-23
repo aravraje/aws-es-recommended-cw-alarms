@@ -31,7 +31,7 @@ parser.add_argument(
 parser.add_argument(
     '-cw_trigger_sns_arn_list', 
     '--cw_trigger_sns_arn_list', 
-    help='''One or more SNS Topic ARNs (comma separated) to which notifications will be sent whenever the CloudWatch Alarms get triggered.
+    help='''One or more SNS Topic ARNs (comma separated) to which notifications will be sent whenever a CloudWatch Alarm gets triggered.
             (Default: None)''', 
     default=None
 )
@@ -49,7 +49,7 @@ parser.add_argument(
     '-es_api_output_sns_arn',
     '--es_api_output_sns_arn',
     help='''If ES API output is enabled, an SNS Topic ARN can be passed to which Lambda will send the output of ES _cat, _cluster, _node APIs. 
-            To save Lambda costs, it's highly recommended not to pass the same SNS Topic ARN that's configured as the trigger for the CloudWatch Alarms (cw_trigger_sns_arn_list).
+            To reduce Lambda costs, it's highly recommended not to pass the same SNS Topic ARN that's configured as the trigger for the CloudWatch Alarms (via cw_trigger_sns_arn_list).
             (Default: None)''',
     default=None
 )
