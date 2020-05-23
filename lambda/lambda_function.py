@@ -5,6 +5,7 @@ import os
 import json
 from time import sleep
 
+# Mapping ES _cluster, _cat, _nodes APIs to the corresponding CW Metric
 METRIC_TO_API_MAPPING = {
     "ClusterStatus.red": [
         "_cluster/health?pretty",
@@ -26,17 +27,22 @@ METRIC_TO_API_MAPPING = {
     ],
     "CPUUtilization": [
         "_cat/nodes?v&s=cpu:desc",
-        "_nodes/nodeid/hot_threads"
+        "_nodes/hot_threads",
     ],
     "JVMMemoryPressure": [
-        "_nodes/stats/jvm?pretty"
-        "_cat/fielddata?v"
+        "_nodes/stats/jvm?pretty",
+        "_cat/fielddata?v",
     ],
-    # for master, add cat pending tasks API and master API
+    "MasterCPUUtilization": [
+        "_cat/master?v",
+        "_cat/pending_tasks?v",
+    ],
 }
 
 
 def lambda_handler(event, context):
+
+    # Return if "es_api_output_sns_arn" is the same as the one configured with "cw_trigger_sns_arn_list" in the "configure" script
     if "IS_CW_ALARM" in event["Records"][0]["Sns"]["MessageAttributes"]:
         return
     
@@ -46,6 +52,8 @@ def lambda_handler(event, context):
     host = "https://" + os.environ["DOMAIN_ENDPOINT"] + "/"
     region = os.environ["DOMAIN_ARN"].split(":")[3]
     service = os.environ["DOMAIN_ARN"].split(":")[2]
+
+    # Building a SigV4 request
     awsauth = AWS4Auth(
         os.environ["AWS_ACCESS_KEY_ID"],
         os.environ["AWS_SECRET_ACCESS_KEY"],
@@ -55,6 +63,7 @@ def lambda_handler(event, context):
     )
     headers = {"Content-Type": "application/json"}
 
+    # Sending the API calls to ES
     if "SNS_TOPIC_ARN" in os.environ:
         send_to_es(
             host,
@@ -79,6 +88,7 @@ def send_to_es(host, cw_metric, apis, awsauth, headers, sns_topic_arn=None):
         "apis": []
     }
 
+    # Invoking the ES _cluster/_cat/_nodes APIs one after the other and adding their output to a list
     for api in apis:
         num_retries, max_retries = 0, 3
         es_backoff = 5 # In Seconds
@@ -103,6 +113,7 @@ def send_to_es(host, cw_metric, apis, awsauth, headers, sns_topic_arn=None):
 
     print(f"ES API output: \n{api_output}")
 
+    # If "es_api_output_sns_arn" is configured via the "configure" script, sending the ES API outputs to SNS
     if sns_topic_arn:
         sns = boto3.client("sns")
         num_retries, max_retries = 0, 3
