@@ -279,8 +279,10 @@ class AwsEsRecommendedCwAlarms(core.Construct):
                 )
 
         # Getting the domain details via boto3
-        profile_name = aws_cli_profile if aws_cli_profile else "default"
-        session = boto3.Session(profile_name=profile_name)
+        if aws_cli_profile and aws_cli_profile.lower() != "default":
+            session = boto3.Session(profile_name=aws_cli_profile)
+        else:
+            session = boto3.Session()
         es_client = session.client("es")
         response = es_client.describe_elasticsearch_domain(
             DomainName=self._domain_name
