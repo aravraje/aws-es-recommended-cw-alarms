@@ -282,7 +282,7 @@ class AwsEsRecommendedCwAlarms(core.Construct):
         if aws_cli_profile and aws_cli_profile.lower() != "default":
             session = boto3.Session(profile_name=aws_cli_profile)
         else:
-            session = boto3.Session()
+            session = boto3.Session(region_name=core.Stack.region)
         es_client = session.client("es")
         response = es_client.describe_elasticsearch_domain(
             DomainName=self._domain_name
